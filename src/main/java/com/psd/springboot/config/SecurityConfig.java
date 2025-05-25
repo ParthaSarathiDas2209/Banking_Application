@@ -14,45 +14,52 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 
 @Configuration
 @EnableWebSecurity                  // Enables Spring Security’s web security support
-@EnableMethodSecurity               // Enables method-level security (e.g. @PreAuthorize)
+@EnableMethodSecurity               // Enables method-level security annotations like @PreAuthorize
 public class SecurityConfig {
 
-    // Defines the main security filter chain for handling HTTP requests
+    // Defines the main security filter chain for HTTP requests
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                // Disables CSRF protection (good for stateless APIs or development)
+                // Disable CSRF protection (common for REST APIs without sessions)
                 .csrf(AbstractHttpConfigurer::disable)
 
-                // Configures URL-based authorization
+                // Define authorization rules based on URL patterns and roles
                 .authorizeHttpRequests(auth -> auth
-                        // Public endpoints accessible by anyone (no authentication required)
+                        // Public endpoints accessible without authentication
                         .requestMatchers("/api/accounts/public/**").permitAll()
 
-                        // Admin endpoints accessible only to users with ROLE_ADMIN
-                        .requestMatchers("/api/accounts/internal/**").hasRole("ADMIN")
+                        // Admin-only secure endpoints (matches your AdminSecureController)
+                        .requestMatchers("/api/admin/secure/**").hasRole("ADMIN")
 
-                        // Any other request must be authenticated
+                        // Admin-only dashboard endpoints (matches your AdminDashboardController)
+                        .requestMatchers("/api/admin/dashboard/**").hasRole("ADMIN")
+
+                        // User-only secure endpoints (matches your UserSecureController)
+                        .requestMatchers("/api/user/secure/**").hasRole("USER")
+
+                        // User dashboard accessible by USER or ADMIN roles
+                        .requestMatchers("/api/user/dashboard/**").hasAnyRole("USER", "ADMIN")
+
+                        // Any other requests require authentication
                         .anyRequest().authenticated()
                 )
 
-                // Enables basic HTTP authentication with default settings
+                // Enable HTTP Basic Authentication
                 .httpBasic(Customizer.withDefaults());
 
-        return http.build();  // Builds and returns the configured security filter chain
+        return http.build();  // Build and return the SecurityFilterChain
     }
 
-    // In-memory user details for development/testing purposes
+    // In-memory user store with two users: admin and user
     @Bean
     public UserDetailsService userDetailsService() {
         return new InMemoryUserDetailsManager(
-                // Admin user with ADMIN role
                 User.withUsername("admin")
-                        .password("{noop}admin123") // {noop} indicates no password encoding
+                        .password("{noop}admin123") // {noop} means no password encoding, plaintext
                         .roles("ADMIN")
                         .build(),
 
-                // Regular user with USER role
                 User.withUsername("user")
                         .password("{noop}user123")
                         .roles("USER")
